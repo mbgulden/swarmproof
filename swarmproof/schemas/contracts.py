@@ -25,6 +25,14 @@ class InvariantViolation:
     message: str
     fatal: bool = True
 
+    def to_dict(self):
+        return {
+            "invariant_number": self.invariant_number,
+            "name": self.name,
+            "message": self.message,
+            "fatal": self.fatal,
+        }
+
 
 @dataclass
 class ValidationReport:
@@ -34,6 +42,14 @@ class ValidationReport:
     violations: List[InvariantViolation] = field(default_factory=list)
     passed_invariants: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self):
+        return {
+            "passed": self.passed,
+            "violations": [v.to_dict() for v in self.violations],
+            "passed_invariants": self.passed_invariants,
+            "metadata": self.metadata,
+        }
 
     def add_violation(self, inv_num: int, name: str, msg: str, fatal: bool = True) -> None:
         self.violations.append(InvariantViolation(inv_num, name, msg, fatal))

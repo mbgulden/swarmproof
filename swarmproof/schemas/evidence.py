@@ -68,7 +68,17 @@ class EvidenceLedger:
             "commit_sha": self.commit_sha,
             "tree_sha": self.tree_sha,
             "clean_diff_check": self.clean_diff_check,
-            "receipt_hashes": [r.stdout_sha256 + r.stderr_sha256 for r in self.receipts],
+            "receipt_hashes": [
+                {
+                    "stdout_sha256": r.stdout_sha256,
+                    "stderr_sha256": r.stderr_sha256,
+                    "exit_code": r.exit_code,
+                    "stage": r.stage.value if hasattr(r.stage, 'value') else str(r.stage),
+                    "command": r.command,
+                    "passed": r.passed,
+                }
+                for r in self.receipts
+            ],
         }
         serialized = json.dumps(canonical_payload, sort_keys=True)
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()

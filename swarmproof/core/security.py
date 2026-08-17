@@ -22,6 +22,11 @@ SECRET_PATTERNS: List[Tuple[str, re.Pattern]] = [
     ("BEARER_TOKEN", re.compile(r"(Bearer\s+)[a-zA-Z0-9\._\-]{20,}", re.IGNORECASE)),
     ("PRIVATE_KEY", re.compile(r"-----BEGIN[ A-Z_-]*PRIVATE KEY-----.*?-----END[ A-Z_-]*PRIVATE KEY-----", re.DOTALL)),
     ("PASSWORD_PARAM", re.compile(r"(password|passwd|secret|token|api_key)=['\"]?(?!\[REDACTED_SECRET\])[^&'\";\s]+['\"]?", re.IGNORECASE)),
+    ("SLACK_TOKEN", re.compile(r"xox[bprs]-[0-9a-zA-Z]{10,}")),
+    ("STRIPE_KEY", re.compile(r"(sk_live_|pk_live_|rk_live_)[a-zA-Z0-9]{20,}")),
+    ("DISCORD_TOKEN", re.compile(r"[MN][A-Za-z\d]{23,}\.[A-Za-z\d_\-]{6}\.[A-Za-z\d_\-]{27,}")),
+    ("URL_CREDENTIALS", re.compile(r"://[^\s:]+:[^\s@]+@", re.IGNORECASE)),
+    ("GENERIC_JWT", re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}")),
 ]
 
 

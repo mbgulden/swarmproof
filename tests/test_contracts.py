@@ -114,6 +114,66 @@ def test_invariant_6_fails_if_status_is_success_with_failed_receipt():
     assert any("Manifest Synchronization Integrity" in v.name for v in report.violations)
 
 
+def test_invariant_2_fails_when_missing_red_receipt():
+    ledger = EvidenceLedger(
+        task_id="GRO-TEST",
+        agent_id="agent",
+        model="model",
+        commit_sha="a" * 40,
+        tree_sha="b" * 40,
+        clean_diff_check=True,
+    )
+    # Only GREEN receipt, no RED
+    receipt = VerificationReceipt.from_execution(
+        stage=ReceiptStage.POST_REPAIR_GREEN,
+        command="pytest tests/",
+        exit_code=0,
+        stdout="pass",
+        stderr="",
+        duration_seconds=0.1,
+    )
+    ledger.add_receipt(receipt)
+    manifest = DualManifest(
+        task_id="GRO-TEST",
+        summary="Missing RED",
+        status="VERIFIED_SUCCESS",
+        ledger=ledger,
+    )
+    report = AntiDeceptionContracts.evaluate(manifest, require_red_green=True)
+    assert report.passed is False
+    assert any("RED-GREEN Decision Trace" in v.name for v in report.violations)
+
+
+def test_invariant_5_fails_on_negative_duration():
+    ledger = EvidenceLedger(
+        task_id="GRO-TEST",
+        agent_id="agent",
+        model="model",
+        commit_sha="a" * 40,
+        tree_sha="b" * 40,
+        clean_diff_check=True,
+    )
+    corrupted_receipt = VerificationReceipt(
+        stage=ReceiptStage.POST_REPAIR_GREEN,
+        command="pytest",
+        exit_code=0,
+        passed=True,
+        duration_seconds=-5.0,  # Corrupted negative duration
+        stdout_sha256="c" * 64,
+        stderr_sha256="d" * 64,
+    )
+    ledger.add_receipt(corrupted_receipt)
+    manifest = DualManifest(
+        task_id="GRO-TEST",
+        summary="Negative duration",
+        status="VERIFIED_SUCCESS",
+        ledger=ledger,
+    )
+    report = AntiDeceptionContracts.evaluate(manifest)
+    assert report.passed is False
+    assert any("Receipt Identity Truth" in v.name for v in report.violations)
+
+
 def test_all_invariants_pass_on_valid_manifest():
     ledger = EvidenceLedger(
         task_id="GRO-PASS",

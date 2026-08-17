@@ -34,6 +34,11 @@ class GatekeeperVerifier:
             report.add_violation(0, "File Access", f"Target manifest file not found: {packet_path}")
             return False, report
 
+        if path.stat().st_size > 10 * 1024 * 1024:
+            report = ValidationReport(passed=False)
+            report.add_violation(0, "File Access", "File size exceeds maximum allowed size")
+            return False, report
+
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             manifest = DualManifest.from_packet(data)

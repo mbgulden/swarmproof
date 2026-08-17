@@ -8,6 +8,8 @@ result-packet.json without content drift.
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -39,8 +41,15 @@ class ManifestSynchronizer:
         md_content = manifest.generate_result_markdown()
         json_content = manifest.to_json_str()
 
-        md_path.write_text(md_content, encoding="utf-8")
-        json_path.write_text(json_content, encoding="utf-8")
+        with tempfile.NamedTemporaryFile(mode='w', dir=str(out_dir), suffix='.tmp', delete=False, encoding='utf-8') as tmp_md:
+            tmp_md.write(md_content)
+            tmp_md_name = tmp_md.name
+        os.replace(tmp_md_name, str(md_path))
+
+        with tempfile.NamedTemporaryFile(mode='w', dir=str(out_dir), suffix='.tmp', delete=False, encoding='utf-8') as tmp_json:
+            tmp_json.write(json_content)
+            tmp_json_name = tmp_json.name
+        os.replace(tmp_json_name, str(json_path))
 
         return md_path, json_path
 

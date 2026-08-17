@@ -27,6 +27,7 @@ class GitOracle:
                 capture_output=True,
                 text=True,
                 timeout=15,
+                encoding="utf-8",
             )
             return res.returncode, res.stdout.strip(), res.stderr.strip()
         except Exception as e:

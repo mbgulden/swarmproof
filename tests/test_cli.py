@@ -9,7 +9,7 @@ from pathlib import Path
 def test_cli_help():
     res = subprocess.run(
         [sys.executable, "-m", "swarmproof", "--help"],
-        cwd=r"C:\Users\Michael Gulden\Github\swarmproof",
+        cwd=str(Path(__file__).parent.parent),
         capture_output=True,
         text=True,
     )
@@ -34,7 +34,7 @@ def test_cli_run_command():
                 "--save",
                 str(save_path),
             ],
-            cwd=r"C:\Users\Michael Gulden\Github\swarmproof",
+            cwd=str(Path(__file__).parent.parent),
             capture_output=True,
             text=True,
         )
@@ -59,7 +59,7 @@ def test_cli_seal_and_verify():
                 "--save",
                 str(rcpt_file),
             ],
-            cwd=r"C:\Users\Michael Gulden\Github\swarmproof",
+            cwd=str(Path(__file__).parent.parent),
             capture_output=True,
             text=True,
         )
@@ -80,7 +80,7 @@ def test_cli_seal_and_verify():
                 "--dir",
                 str(tmp_dir),
             ],
-            cwd=r"C:\Users\Michael Gulden\Github\swarmproof",
+            cwd=str(Path(__file__).parent.parent),
             capture_output=True,
             text=True,
         )
@@ -99,7 +99,7 @@ def test_cli_seal_and_verify():
                 str(packet_path),
                 "--no-git",
             ],
-            cwd=r"C:\Users\Michael Gulden\Github\swarmproof",
+            cwd=str(Path(__file__).parent.parent),
             capture_output=True,
             text=True,
         )

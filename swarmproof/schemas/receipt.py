@@ -99,11 +99,11 @@ class VerificationReceipt:
     def to_dict(self) -> Dict[str, Any]:
         """Convert receipt to dictionary representation."""
         data = asdict(self)
-        if isinstance(data.get("stage"), Enum):
-            data["stage"] = data["stage"].value
         return data
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> VerificationReceipt:
         """Reconstruct receipt from dictionary."""
+        if 'stage' in data:
+            data['stage'] = ReceiptStage(data['stage'])
         return cls(**data)

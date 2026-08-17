@@ -21,7 +21,7 @@ class ShadowQuarantineEngine:
     def __init__(self, repo_root: Optional[str | Path] = None) -> None:
         self.repo_root = Path(repo_root) if repo_root else Path.cwd()
 
-    def extract_git_file(self, file_rel_path: str, git_ref: str = "HEAD~1") -> Optional[str]:
+    def extract_git_file(self, file_rel_path: str, git_ref: str = "HEAD~1") -> Optional[bytes]:
         """
         Extract pristine file contents from git history at git_ref.
         """
@@ -32,7 +32,6 @@ class ShadowQuarantineEngine:
                 ["git", "show", f"{git_ref}:{normalized_path}"],
                 cwd=self.repo_root,
                 capture_output=True,
-                text=True,
                 timeout=10,
             )
             if res.returncode == 0:
@@ -72,11 +71,11 @@ class ShadowQuarantineEngine:
             )
 
         # Backup current working tree content
-        original_content = target_path.read_text(encoding="utf-8") if target_path.exists() else None
+        original_content = target_path.read_bytes() if target_path.exists() else None
 
         try:
             # Mount pristine baseline test file
-            target_path.write_text(baseline_content, encoding="utf-8")
+            target_path.write_bytes(baseline_content)
 
             # Execute oracle test runner against pristine test file
             receipt = runner.run_command(
@@ -88,4 +87,6 @@ class ShadowQuarantineEngine:
         finally:
             # Restore working tree content
             if original_content is not None:
-                target_path.write_text(original_content, encoding="utf-8")
+                target_path.write_bytes(original_content)
+            else:
+                target_path.unlink(missing_ok=True)

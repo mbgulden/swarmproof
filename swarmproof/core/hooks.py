@@ -74,7 +74,7 @@ class GitHookInstaller:
             # Set executable permissions (0o755)
             try:
                 p_commit.chmod(p_commit.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-            except Exception:
+            except OSError:
                 pass
             installed["pre-commit"] = str(p_commit)
 
@@ -83,7 +83,7 @@ class GitHookInstaller:
             p_push.write_text(HOOK_SCRIPT_TEMPLATE, encoding="utf-8")
             try:
                 p_push.chmod(p_push.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-            except Exception:
+            except OSError:
                 pass
             installed["pre-push"] = str(p_push)
 

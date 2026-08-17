@@ -99,6 +99,23 @@ class ASTAssertionGuard:
                                 if len(handler.body) == 1 and isinstance(handler.body[0], ast.Pass):
                                     metrics.suppression_blocks.append(f"{node.name}: try/except pass")
 
+                    # Check for exec/eval/compile calls inside test functions
+                    for sub in ast.walk(node):
+                        if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Name):
+                            if sub.func.id in ('exec', 'eval', 'compile'):
+                                metrics.suppression_blocks.append(f"{node.name}: {sub.func.id}() call")
+
+            # 3. Check for import aliases
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name in ('pytest', 'unittest') and alias.asname:
+                        metrics.suppression_blocks.append(f"ImportAlias: {alias.name} as {alias.asname}")
+            elif isinstance(node, ast.ImportFrom):
+                if node.module in ('pytest', 'unittest'):
+                    for alias in node.names:
+                        if alias.asname:
+                            metrics.suppression_blocks.append(f"ImportAlias: {alias.name} as {alias.asname} from {node.module}")
+
         return metrics
 
     @classmethod

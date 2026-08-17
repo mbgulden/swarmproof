@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "swarmproof"
-version = "0.2.0"
+version = "0.3.0"
 description = "Universal Multi-Agent Verification & Truth Oracle Engine"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -19,6 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Testing",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
@@ -36,3 +37,11 @@ swarmproof = "swarmproof.cli.main:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["swarmproof*"]
+
+[tool.setuptools.package-data]
+swarmproof = ["py.typed"]
+
+[project.urls]
+Homepage = "https://github.com/mbgulden/swarmproof"
+Repository = "https://github.com/mbgulden/swarmproof"
+Issues = "https://github.com/mbgulden/swarmproof/issues"
