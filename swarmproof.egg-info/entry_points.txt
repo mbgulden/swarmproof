@@ -1,0 +1,2 @@
+[console_scripts]
+swarmproof = swarmproof.cli.main:main
