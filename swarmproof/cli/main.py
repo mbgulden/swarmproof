@@ -106,6 +106,89 @@ def cmd_verify(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_guard(args: argparse.Namespace) -> int:
+    """Analyze test file or compare with baseline for assertion weakening."""
+    from swarmproof.core.ast_guard import ASTAssertionGuard
+
+    cand_path = Path(args.candidate)
+    if not cand_path.exists():
+        print(f"Error: Candidate file not found: {cand_path}")
+        return 1
+
+    cand_code = cand_path.read_text(encoding="utf-8")
+
+    if args.baseline:
+        base_path = Path(args.baseline)
+        if not base_path.exists():
+            print(f"Error: Baseline file not found: {base_path}")
+            return 1
+        base_code = base_path.read_text(encoding="utf-8")
+        report = ASTAssertionGuard.diff_metrics(base_code, cand_code)
+
+        print("\n=== SWARMPROOF AST GUARD DIFF REPORT ===")
+        print(f"  Baseline Asserts: {report.baseline_asserts} | Candidate Asserts: {report.candidate_asserts}")
+        if report.violations:
+            print("\n[FAIL] AST VIOLATIONS DETECTED:")
+            for v in report.violations:
+                print(f"  ❌ {v}")
+            return 1
+        print("\n[OK] Test suite assertions verified intact (No weakening detected).")
+        return 0
+    else:
+        metrics = ASTAssertionGuard.analyze_code(cand_code)
+        print("\n=== SWARMPROOF AST ANALYSIS ===")
+        print(f"  Total Asserts: {metrics.assert_count}")
+        print(f"  Tautological Asserts: {len(metrics.tautological_asserts)}")
+        print(f"  Skip Decorators: {len(metrics.skip_decorators)}")
+        print(f"  Suppression Blocks: {len(metrics.suppression_blocks)}")
+        if metrics.tautological_asserts or metrics.skip_decorators or metrics.suppression_blocks:
+            print("\n[WARN] Potential test anti-patterns found.")
+            return 1
+        print("\n[OK] Test file is clean.")
+        return 0
+
+
+def cmd_shadow(args: argparse.Namespace) -> int:
+    """Execute test oracle using immutable quarantined baseline test."""
+    from swarmproof.core.quarantine import ShadowQuarantineEngine
+
+    engine = ShadowQuarantineEngine()
+    print(f"[SwarmProof] Running shadow quarantined test: {args.test_file} (ref: {args.ref})")
+    receipt = engine.run_quarantined_test(
+        test_file_path=args.test_file,
+        test_command=args.cmd,
+        git_ref=args.ref,
+    )
+    status_str = "[PASSED]" if receipt.passed else "[FAILED]"
+    print(f"{status_str} Exit Code: {receipt.exit_code} | Duration: {receipt.duration_seconds}s")
+    print(f"Stdout SHA-256: {receipt.stdout_sha256}")
+    return receipt.exit_code
+
+
+def cmd_hook(args: argparse.Namespace) -> int:
+    """Install or uninstall universal SwarmProof git hooks."""
+    from swarmproof.core.hooks import GitHookInstaller
+
+    target_dir = args.dir or "."
+    if args.action == "install":
+        try:
+            installed = GitHookInstaller.install_hooks(target_dir=target_dir)
+            print("Successfully installed SwarmProof git hooks:")
+            for name, path in installed.items():
+                print(f"  ✅ {name} -> {path}")
+            return 0
+        except Exception as e:
+            print(f"Error installing hooks: {e}")
+            return 1
+    elif args.action == "uninstall":
+        uninstalled = GitHookInstaller.uninstall_hooks(target_dir=target_dir)
+        print("SwarmProof hook removal results:")
+        for name, res in uninstalled.items():
+            print(f"  {'✅ Removed' if res else '⚪ Not Found'}: {name}")
+        return 0
+    return 1
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="swarmproof",
@@ -138,9 +221,29 @@ def main() -> None:
     p_verify.add_argument("--no-git", action="store_true", help="Skip git commit/tree SHA checks")
     p_verify.set_defaults(func=cmd_verify)
 
+    # guard
+    p_guard = subparsers.add_parser("guard", help="AST analysis and assertion diffing")
+    p_guard.add_argument("--candidate", "-c", required=True, help="Path to candidate test file")
+    p_guard.add_argument("--baseline", "-b", help="Path to baseline test file for diff comparison")
+    p_guard.set_defaults(func=cmd_guard)
+
+    # shadow
+    p_shadow = subparsers.add_parser("shadow", help="Run test oracle with quarantined baseline test")
+    p_shadow.add_argument("--test-file", required=True, help="Relative path to test file")
+    p_shadow.add_argument("--cmd", required=True, help="Test execution command")
+    p_shadow.add_argument("--ref", default="HEAD~1", help="Git reference for baseline test")
+    p_shadow.set_defaults(func=cmd_shadow)
+
+    # hook
+    p_hook = subparsers.add_parser("hook", help="Install universal git pre-commit & pre-push hooks")
+    p_hook.add_argument("action", choices=["install", "uninstall"], help="Action to perform")
+    p_hook.add_argument("--dir", default=".", help="Repository path")
+    p_hook.set_defaults(func=cmd_hook)
+
     args = parser.parse_args()
     exit_code = args.func(args)
     sys.exit(exit_code)
+
 
 
 if __name__ == "__main__":

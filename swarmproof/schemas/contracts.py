@@ -224,5 +224,18 @@ class AntiDeceptionContracts:
         else:
             report.add_passed("Invariant 9: Credential Sanitization Fence")
 
+        # ── INVARIANT 10: Test Suite Non-Weakening & AST Integrity ────
+        from swarmproof.core.ast_guard import ASTAssertionGuard
+        ast_violations = manifest.ledger.metadata.get("ast_violations", [])
+        if ast_violations:
+            report.add_violation(
+                10,
+                "Test Suite Non-Weakening & AST Integrity",
+                f"Test assertions were weakened or bypassed: {ast_violations}"
+            )
+        else:
+            report.add_passed("Invariant 10: Test Suite Non-Weakening & AST Integrity")
+
         return report
+
 

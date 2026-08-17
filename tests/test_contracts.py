@@ -151,5 +151,6 @@ def test_all_invariants_pass_on_valid_manifest():
     report = AntiDeceptionContracts.evaluate(manifest, require_red_green=True, require_git_tree=True)
     assert report.passed is True
     assert len(report.violations) == 0
-    assert len(report.passed_invariants) == 9
+    assert len(report.passed_invariants) == 10
+
 
