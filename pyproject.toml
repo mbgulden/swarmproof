@@ -8,13 +8,12 @@ version = "0.3.0"
 description = "Universal Multi-Agent Verification & Truth Oracle Engine"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
 authors = [{ name = "GrowthWebDev", email = "dev@growthwebdev.com" }]
-keywords = ["agents", "verification", "tdd", "oracle", "testing", "anti-hallucination", "swarm"]
+keywords = ["agents", "verification", "tdd", "oracle", "testing", "anti-hallucination", "swarm", "ai-agents", "llm-testing"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -29,6 +28,7 @@ dependencies = []
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
+    "build>=1.0.0",
 ]
 
 [project.scripts]
@@ -45,3 +45,5 @@ swarmproof = ["py.typed"]
 Homepage = "https://github.com/mbgulden/swarmproof"
 Repository = "https://github.com/mbgulden/swarmproof"
 Issues = "https://github.com/mbgulden/swarmproof/issues"
+Changelog = "https://github.com/mbgulden/swarmproof/blob/main/CHANGELOG.md"
+
