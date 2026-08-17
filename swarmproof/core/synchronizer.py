@@ -26,12 +26,15 @@ class ManifestSynchronizer:
     ) -> Tuple[Path, Path]:
         """
         Atomically write both RESULT.md and result-packet.json to output directory.
+        Sanitizes filenames to prevent path traversal escapes.
         """
+        from swarmproof.core.security import PathSanitizer
+
         out_dir = Path(output_dir) if output_dir else Path.cwd()
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        md_path = out_dir / md_filename
-        json_path = out_dir / json_filename
+        md_path = PathSanitizer.sanitize(out_dir, md_filename)
+        json_path = PathSanitizer.sanitize(out_dir, json_filename)
 
         md_content = manifest.generate_result_markdown()
         json_content = manifest.to_json_str()
@@ -40,6 +43,7 @@ class ManifestSynchronizer:
         json_path.write_text(json_content, encoding="utf-8")
 
         return md_path, json_path
+
 
     @staticmethod
     def load_from_directory(

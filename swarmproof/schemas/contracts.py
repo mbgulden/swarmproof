@@ -8,6 +8,7 @@ tampered manifests, or missing execution handles.
 from __future__ import annotations
 
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -159,4 +160,69 @@ class AntiDeceptionContracts:
         else:
             report.add_passed("Invariant 6: Manifest Synchronization Integrity")
 
+        # ── INVARIANT 7: Anti-Replay & Timestamp Freshness ─────────────
+        # Receipts must not be older than max_age_seconds (default 2 hours) and commit SHA must match ledger if present.
+        now = time.time()
+        max_age_seconds = 7200.0  # 2 hours
+        stale_receipts = [
+            r for r in manifest.ledger.receipts
+            if (now - r.timestamp) > max_age_seconds
+        ]
+        if stale_receipts:
+            report.add_violation(
+                7,
+                "Anti-Replay Freshness",
+                f"Found {len(stale_receipts)} stale receipts older than {int(max_age_seconds/3600)}h window."
+            )
+        else:
+            mismatched_commits = [
+                r for r in manifest.ledger.receipts
+                if r.commit_sha and manifest.ledger.commit_sha and r.commit_sha != manifest.ledger.commit_sha
+            ]
+            if mismatched_commits:
+                report.add_violation(
+                    7,
+                    "Anti-Replay Commit Nonce Binding",
+                    f"Receipt commit nonce ({mismatched_commits[0].commit_sha[:8]}) does not match ledger commit ({manifest.ledger.commit_sha[:8]})."
+                )
+            else:
+                report.add_passed("Invariant 7: Anti-Replay Freshness & Commit Binding")
+
+        # ── INVARIANT 8: RED-GREEN Command Target Equivalence ──────────
+        # When both RED and GREEN receipts exist, their command targets must align.
+        red_receipts = [r for r in manifest.ledger.receipts if r.stage == ReceiptStage.PRE_REPAIR_RED or r.stage == "PRE_REPAIR_RED"]
+        green_receipts = [r for r in manifest.ledger.receipts if r.stage == ReceiptStage.POST_REPAIR_GREEN or r.stage == "POST_REPAIR_GREEN"]
+        if red_receipts and green_receipts:
+            red_cmd = red_receipts[0].command.strip().lower()
+            green_cmd = green_receipts[0].command.strip().lower()
+            # Normalize whitespace
+            red_cmd_norm = " ".join(red_cmd.split())
+            green_cmd_norm = " ".join(green_cmd.split())
+            if red_cmd_norm != green_cmd_norm:
+                report.add_violation(
+                    8,
+                    "RED-GREEN Command Target Equivalence",
+                    f"RED pre-repair command ('{red_cmd_norm}') does not match GREEN post-repair command ('{green_cmd_norm}'). Synthetic RED errors are rejected."
+                )
+            else:
+                report.add_passed("Invariant 8: RED-GREEN Command Target Equivalence")
+        else:
+            report.add_passed("Invariant 8: Command Target Validated")
+
+        # ── INVARIANT 9: Secret & Credential Leak Protection ──────────
+        from swarmproof.core.security import SecretScrubber
+        leaked = []
+        for r in manifest.ledger.receipts:
+            if SecretScrubber.has_secrets(r.stdout_preview) or SecretScrubber.has_secrets(r.stderr_preview):
+                leaked.append(r.receipt_id)
+        if leaked:
+            report.add_violation(
+                9,
+                "Credential Sanitization Fence",
+                f"Receipts {leaked} contain unredacted sensitive tokens or API credentials."
+            )
+        else:
+            report.add_passed("Invariant 9: Credential Sanitization Fence")
+
         return report
+

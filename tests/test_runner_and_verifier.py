@@ -59,7 +59,8 @@ def test_manifest_synchronizer_write_and_verify():
         assert loaded is not None
         assert loaded.task_id == "GRO-SYNC"
 
-        # Gatekeeper evaluation on disk file
-        passed, report = GatekeeperVerifier.verify_file(json_path)
+        # Gatekeeper evaluation on disk file (without requiring live git index in tmp dir)
+        passed, report = GatekeeperVerifier.verify_file(json_path, require_git=False)
         assert passed is True
         assert len(report.violations) == 0
+

@@ -41,6 +41,7 @@ class VerificationReceipt:
     stdout_preview: str = ""
     stderr_preview: str = ""
     receipt_id: str = field(default_factory=lambda: f"rcpt-{int(time.time() * 1000)}-{str(uuid.uuid4())[:6]}")
+    commit_sha: Optional[str] = None
     timestamp: float = field(default_factory=time.time)
     iso_timestamp: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
@@ -63,11 +64,19 @@ class VerificationReceipt:
         stderr: str,
         duration_seconds: float,
         cwd: Optional[str] = None,
-        max_preview_len: int = 1000,
+        commit_sha: Optional[str] = None,
+        max_preview_len: int = 65536,  # 64 KB bounded buffer
     ) -> VerificationReceipt:
-        """Construct an immutable receipt from raw command output."""
-        stdout_bytes = stdout.encode("utf-8", errors="replace")
-        stderr_bytes = stderr.encode("utf-8", errors="replace")
+        """Construct an immutable receipt with automatic secret scrubbing."""
+        from swarmproof.core.security import SecretScrubber
+
+        # Scrub sensitive credentials before computing digests or previews
+        clean_command = SecretScrubber.scrub(command)
+        clean_stdout = SecretScrubber.scrub(stdout)
+        clean_stderr = SecretScrubber.scrub(stderr)
+
+        stdout_bytes = clean_stdout.encode("utf-8", errors="replace")
+        stderr_bytes = clean_stderr.encode("utf-8", errors="replace")
         stdout_hash = hashlib.sha256(stdout_bytes).hexdigest()
         stderr_hash = hashlib.sha256(stderr_bytes).hexdigest()
 
@@ -75,15 +84,16 @@ class VerificationReceipt:
 
         return cls(
             stage=stage if isinstance(stage, ReceiptStage) else ReceiptStage(stage),
-            command=command,
+            command=clean_command,
             exit_code=exit_code,
             passed=passed,
             duration_seconds=round(duration_seconds, 4),
             stdout_sha256=stdout_hash,
             stderr_sha256=stderr_hash,
-            stdout_preview=stdout[:max_preview_len],
-            stderr_preview=stderr[:max_preview_len],
+            stdout_preview=clean_stdout[:max_preview_len],
+            stderr_preview=clean_stderr[:max_preview_len],
             cwd=cwd or os.getcwd(),
+            commit_sha=commit_sha,
         )
 
     def to_dict(self) -> Dict[str, Any]:
