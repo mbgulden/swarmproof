@@ -1,5 +1,5 @@
 """
-SwarmProof CLI: Universal Multi-Agent Verification & Evidence Engine.
+SwarmProof CLI: Universal Multi-Agent Verification & Truth Oracle Engine v2.
 """
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ import json
 import sys
 from pathlib import Path
 
+from swarmproof.bridge import SwarmproofBridge
 from swarmproof.core.git_oracle import GitOracle
 from swarmproof.core.runner import TestRunner
 from swarmproof.core.synchronizer import ManifestSynchronizer
@@ -19,7 +20,6 @@ from swarmproof.schemas.receipt import ReceiptStage, VerificationReceipt
 
 
 def cmd_run(args: argparse.Namespace) -> int:
-    """Execute a verification command and print/save the receipt."""
     runner = TestRunner()
     stage = args.stage or ReceiptStage.GENERIC_VERIFICATION
     print(f"[SwarmProof] Running verification command ({stage}): {args.test}")
@@ -37,8 +37,46 @@ def cmd_run(args: argparse.Namespace) -> int:
     return receipt.exit_code
 
 
+def cmd_check(args: argparse.Namespace) -> int:
+    """Run deterministic multi-oracle invariant check on a target file."""
+    passed, cert, diags = SwarmproofBridge.verify_and_settle(
+        target_file=args.target_file,
+        tx_id=args.tx_id,
+        holder=args.holder,
+        lock_id=args.lock_id,
+        run_tests=not args.no_tests
+    )
+
+    if args.json:
+        if passed and cert:
+            print(json.dumps({"status": "PASS", "proof": json.loads(cert.to_json())}, indent=2))
+        else:
+            print(json.dumps({"status": "FAIL", "diagnostics": [d.to_dict() for d in diags]}, indent=2))
+        return 0 if passed else 1
+
+    if passed and cert:
+        print("=" * 60)
+        print(f" 🛡️ SWARMPROOF v2: VERIFICATION PASSED")
+        print("=" * 60)
+        print(f"  Proof ID:        {cert.proof_id}")
+        print(f"  Target File:     {cert.target_path}")
+        print(f"  AST Checksum:    {cert.ast_checksum}")
+        print(f"  Oracles Passed:  {', '.join(cert.oracles_passed)}")
+        print("=" * 60)
+        return 0
+    else:
+        print("=" * 60)
+        print(f" ❌ SWARMPROOF v2: VERIFICATION FAILED ({len(diags)} violation(s))")
+        print("=" * 60)
+        for d in diags:
+            print(f"  [{d.error_type}] {d.file}:{d.line}:{d.column} -> {d.message} ({d.rule})")
+            if d.snippet:
+                print(f"    Code Context:\n{d.snippet.strip()}")
+        print("=" * 60)
+        return 1
+
+
 def cmd_seal(args: argparse.Namespace) -> int:
-    """Collect git evidence and receipts to seal a dual manifest."""
     print(f"[SwarmProof] Sealing evidence manifest for task: {args.task}")
     git = GitOracle()
     git_evidence = git.collect_git_evidence()
@@ -53,7 +91,6 @@ def cmd_seal(args: argparse.Namespace) -> int:
         diff_stat=str(git_evidence["diff_stat"]),
     )
 
-    # Load any receipts from file if specified
     if args.receipts:
         for r_path in args.receipts:
             try:
@@ -80,12 +117,20 @@ def cmd_seal(args: argparse.Namespace) -> int:
 
 
 def cmd_verify(args: argparse.Namespace) -> int:
-    """Fail-closed verification check against a result packet."""
-    target_file = Path(args.packet or "result-packet.json")
-    print(f"[SwarmProof] Verifying evidence packet: {target_file}")
+    target_path = Path(args.packet or "result-packet.json")
+    if target_path.suffix == ".py":
+        # Route to multi-oracle check
+        args.target_file = str(target_path)
+        args.tx_id = None
+        args.holder = "default_agent"
+        args.lock_id = None
+        args.no_tests = False
+        args.json = False
+        return cmd_check(args)
 
+    print(f"[SwarmProof] Verifying evidence packet: {target_path}")
     passed, report = GatekeeperVerifier.verify_file(
-        target_file,
+        target_path,
         strict_red_green=args.strict,
         require_git=not args.no_git,
     )
@@ -107,7 +152,6 @@ def cmd_verify(args: argparse.Namespace) -> int:
 
 
 def cmd_guard(args: argparse.Namespace) -> int:
-    """Analyze test file or compare with baseline for assertion weakening."""
     from swarmproof.core.ast_guard import ASTAssertionGuard
 
     cand_path = Path(args.candidate)
@@ -148,53 +192,22 @@ def cmd_guard(args: argparse.Namespace) -> int:
         return 0
 
 
-def cmd_shadow(args: argparse.Namespace) -> int:
-    """Execute test oracle using immutable quarantined baseline test."""
-    from swarmproof.core.quarantine import ShadowQuarantineEngine
-
-    engine = ShadowQuarantineEngine()
-    print(f"[SwarmProof] Running shadow quarantined test: {args.test_file} (ref: {args.ref})")
-    receipt = engine.run_quarantined_test(
-        test_file_path=args.test_file,
-        test_command=args.cmd,
-        git_ref=args.ref,
-    )
-    status_str = "[PASSED]" if receipt.passed else "[FAILED]"
-    print(f"{status_str} Exit Code: {receipt.exit_code} | Duration: {receipt.duration_seconds}s")
-    print(f"Stdout SHA-256: {receipt.stdout_sha256}")
-    return receipt.exit_code
-
-
-def cmd_hook(args: argparse.Namespace) -> int:
-    """Install or uninstall universal SwarmProof git hooks."""
-    from swarmproof.core.hooks import GitHookInstaller
-
-    target_dir = args.dir or "."
-    if args.action == "install":
-        try:
-            installed = GitHookInstaller.install_hooks(target_dir=target_dir)
-            print("Successfully installed SwarmProof git hooks:")
-            for name, path in installed.items():
-                print(f"  ✅ {name} -> {path}")
-            return 0
-        except Exception as e:
-            print(f"Error installing hooks: {e}")
-            return 1
-    elif args.action == "uninstall":
-        uninstalled = GitHookInstaller.uninstall_hooks(target_dir=target_dir)
-        print("SwarmProof hook removal results:")
-        for name, res in uninstalled.items():
-            print(f"  {'✅ Removed' if res else '⚪ Not Found'}: {name}")
-        return 0
-    return 1
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="swarmproof",
         description="SwarmProof: Universal Multi-Agent Verification & Truth Oracle Engine",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # check
+    p_check = subparsers.add_parser("check", help="Deterministic Multi-Oracle Invariant Check")
+    p_check.add_argument("target_file", help="Path to code file to verify")
+    p_check.add_argument("--tx-id", default=None, help="Swarmlock Transaction ID")
+    p_check.add_argument("--holder", default="default_agent", help="Holder Agent ID")
+    p_check.add_argument("--lock-id", default=None, help="Swarmlock Lease ID")
+    p_check.add_argument("--no-tests", action="store_true", help="Skip targeted pytest")
+    p_check.add_argument("--json", action="store_true", help="Output JSON diagnostics")
+    p_check.set_defaults(func=cmd_check)
 
     # run
     p_run = subparsers.add_parser("run", help="Run a verification test command")
@@ -206,17 +219,17 @@ def main() -> None:
 
     # seal
     p_seal = subparsers.add_parser("seal", help="Seal dual manifests from git and execution evidence")
-    p_seal.add_argument("--task", required=True, help="Task or Linear Issue identifier (e.g. GRO-4768)")
-    p_seal.add_argument("--agent", required=True, help="Agent identity (e.g. agy, hermes, fred)")
-    p_seal.add_argument("--model", default="claude-3.7-sonnet", help="Model used (e.g. gemini-2.5-pro)")
+    p_seal.add_argument("--task", required=True, help="Task or Linear Issue identifier")
+    p_seal.add_argument("--agent", required=True, help="Agent identity")
+    p_seal.add_argument("--model", default="claude-3.7-sonnet", help="Model used")
     p_seal.add_argument("--summary", help="Human readable completion summary")
-    p_seal.add_argument("--receipts", nargs="*", help="Receipt JSON files to include in ledger")
-    p_seal.add_argument("--dir", default=".", help="Output directory for RESULT.md and result-packet.json")
+    p_seal.add_argument("--receipts", nargs="*", help="Receipt JSON files")
+    p_seal.add_argument("--dir", default=".", help="Output directory")
     p_seal.set_defaults(func=cmd_seal)
 
     # verify
-    p_verify = subparsers.add_parser("verify", help="Fail-closed evaluation of result packet")
-    p_verify.add_argument("packet", nargs="?", default="result-packet.json", help="Path to result-packet.json")
+    p_verify = subparsers.add_parser("verify", help="Fail-closed evaluation of result packet or code file")
+    p_verify.add_argument("packet", nargs="?", default="result-packet.json", help="Path to result-packet.json or source file")
     p_verify.add_argument("--strict", action="store_true", help="Require strict RED->GREEN trace")
     p_verify.add_argument("--no-git", action="store_true", help="Skip git commit/tree SHA checks")
     p_verify.set_defaults(func=cmd_verify)
@@ -227,23 +240,9 @@ def main() -> None:
     p_guard.add_argument("--baseline", "-b", help="Path to baseline test file for diff comparison")
     p_guard.set_defaults(func=cmd_guard)
 
-    # shadow
-    p_shadow = subparsers.add_parser("shadow", help="Run test oracle with quarantined baseline test")
-    p_shadow.add_argument("--test-file", required=True, help="Relative path to test file")
-    p_shadow.add_argument("--cmd", required=True, help="Test execution command")
-    p_shadow.add_argument("--ref", default="HEAD~1", help="Git reference for baseline test")
-    p_shadow.set_defaults(func=cmd_shadow)
-
-    # hook
-    p_hook = subparsers.add_parser("hook", help="Install universal git pre-commit & pre-push hooks")
-    p_hook.add_argument("action", choices=["install", "uninstall"], help="Action to perform")
-    p_hook.add_argument("--dir", default=".", help="Repository path")
-    p_hook.set_defaults(func=cmd_hook)
-
     args = parser.parse_args()
     exit_code = args.func(args)
     sys.exit(exit_code)
-
 
 
 if __name__ == "__main__":
