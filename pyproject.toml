@@ -9,7 +9,7 @@ description = "Universal Multi-Agent Verification & Truth Oracle Engine"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
-authors = [{ name = "GrowthWebDev", email = "dev@growthwebdev.com" }]
+authors = [{ name = "Michael Gulden", email = "michael@growthwebdev.com" }]
 keywords = ["agents", "verification", "tdd", "oracle", "testing", "anti-hallucination", "swarm", "ai-agents", "llm-testing"]
 classifiers = [
     "Development Status :: 4 - Beta",
