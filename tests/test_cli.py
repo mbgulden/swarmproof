@@ -105,3 +105,16 @@ def test_cli_seal_and_verify():
         )
         assert res_verify.returncode == 0
         assert "APPROVED" in res_verify.stdout
+
+
+def test_cli_version():
+    from swarmproof import __version__
+
+    res = subprocess.run(
+        [sys.executable, "-m", "swarmproof", "--version"],
+        cwd=str(Path(__file__).parent.parent),
+        capture_output=True,
+        text=True,
+    )
+    assert res.returncode == 0
+    assert __version__ in res.stdout

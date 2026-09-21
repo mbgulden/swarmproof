@@ -9,6 +9,7 @@ import json
 import sys
 from pathlib import Path
 
+from swarmproof import __version__
 from swarmproof.bridge import SwarmproofBridge
 from swarmproof.core.git_oracle import GitOracle
 from swarmproof.core.runner import TestRunner
@@ -196,6 +197,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         prog="swarmproof",
         description="SwarmProof: Universal Multi-Agent Verification & Truth Oracle Engine",
+    )
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {__version__}"
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
